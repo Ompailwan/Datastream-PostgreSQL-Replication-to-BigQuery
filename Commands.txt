@@ -1,0 +1,71 @@
+--Enable API for SQL
+
+gcloud services enable sqladmin.googleapis.com
+
+
+--command to create a Cloud SQL for PostgreSQL database instance
+
+POSTGRES_INSTANCE=postgres-db
+DATASTREAM_IPS=IP_ADDRESS
+gcloud sql instances create ${POSTGRES_INSTANCE} \
+    --database-version=POSTGRES_14 \
+    --cpu=2 --memory=10GB \
+    --authorized-networks=${DATASTREAM_IPS} \
+    --region=REGION \
+    --root-password pwd \
+    --database-flags=cloudsql.logical_decoding=on
+	
+--command to Connect to the PostgreSQL database 	
+	
+gcloud sql connect postgres-db --user=postgres
+
+-- Once connected to the database, run the following SQL command to create a sample schema and table
+
+CREATE SCHEMA IF NOT EXISTS test;
+
+CREATE TABLE IF NOT EXISTS test.example_table (
+id  SERIAL PRIMARY KEY,
+text_col VARCHAR(50),
+int_col INT,
+date_col TIMESTAMP
+);
+
+ALTER TABLE test.example_table REPLICA IDENTITY DEFAULT; 
+
+INSERT INTO test.example_table (text_col, int_col, date_col) VALUES
+('hello', 0, '2020-01-01 00:00:00'),
+('goodbye', 1, NULL),
+('name', -987, NOW()),
+('other', 2786, '2021-01-01 00:00:00');
+
+
+--Configure the database for replication
+--command to create a publication and a replication slot
+
+CREATE PUBLICATION test_publication FOR ALL TABLES;
+ALTER USER POSTGRES WITH REPLICATION;
+SELECT PG_CREATE_LOGICAL_REPLICATION_SLOT('test_replication', 'pgoutput');
+
+Created a postgreSQL connection profile
+
+Created a Bigquery connection profile
+
+Created the stream which connects the connection profiles created above and defines the configuration for the data to stream from source to destination
+
+--command to connect postgreSQl db and make changes to track in BQ
+
+gcloud sql connect postgres-db --user=postgres
+
+INSERT INTO test.example_table (text_col, int_col, date_col) VALUES
+('abc', 0, '2022-10-01 00:00:00'),
+('def', 1, NULL),
+('ghi', -987, NOW());
+
+UPDATE test.example_table SET int_col=int_col*2; 
+
+DELETE FROM test.example_table WHERE text_col = 'abc';
+
+
+-- BQ Query to check changes
+
+SELECT * FROM test.example_table ORDER BY id;
